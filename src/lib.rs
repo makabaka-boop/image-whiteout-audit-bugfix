@@ -314,10 +314,10 @@ fn validate_path(path: &str) -> Result<(), MergeError> {
         return Err(bad("path must be relative, not absolute"));
     }
     for seg in path.split('/') {
-        if seg.is_empty() && path.ends_with('/') {
+        if seg.is_empty() {
             return Err(bad("path contains an empty segment (leading/trailing/double slash)"));
         }
-        if seg == "." {
+        if seg == "." || seg == ".." {
             return Err(bad("path contains a '.' or '..' segment"));
         }
         if !seg.bytes().all(|b| (0x20..=0x7e).contains(&b)) {
@@ -367,8 +367,8 @@ struct Engine {
 
 impl Engine {
     fn apply_layer(&mut self, idx: usize, layer: &LayerInput) -> Result<(), MergeError> {
-        if layer.writes.len() > 1 { check_layer_conflicts(idx, layer)?; }
-        if !layer.mkdirs.is_empty() { self.check_opaques(idx, layer)?; }
+        check_layer_conflicts(idx, layer)?;
+        self.check_opaques(idx, layer)?;
         self.check_parents(idx, layer)?;
 
         // 1. Whiteouts and opaque markers act on the lower snapshot.
@@ -458,6 +458,7 @@ impl Engine {
                     via: Some(path.to_string()),
                 });
             }
+            remove_descendants(&mut self.map, path);
         }
         self.map.remove(path);
     }
@@ -475,6 +476,9 @@ impl Engine {
                 via: Some(path.to_string()),
             });
         }
+        // The directory itself survives (keeping its source); every lower
+        // child is hidden.
+        remove_descendants(&mut self.map, path);
     }
 
     /// Create `path` (and any missing ancestors) as directories. An explicit
@@ -523,7 +527,7 @@ impl Engine {
             Some(e) if e.kind == Kind::File => {
                 self.events.push(Obscured {
                     path: path.to_string(),
-                    source_layer: idx,
+                    source_layer: e.source,
                     reason: Reason::Overwritten,
                     by_layer: idx,
                     via: None,
@@ -547,6 +551,7 @@ impl Engine {
                         via: Some(path.to_string()),
                     });
                 }
+                remove_descendants(&mut self.map, path);
                 self.map.insert(path.to_string(), Entry { kind: Kind::File, source: idx });
             }
         }
@@ -563,20 +568,13 @@ impl Engine {
             .map(|(p, e)| FileSource { path: p.clone(), source_layer: e.source })
             .collect();
         let dirs = self.map.values().filter(|e| e.kind == Kind::Dir).count();
+        let obscured = self.events.len();
         Output {
             tree: build_tree(&self.map),
             obscured: self.events,
-            stats: Stats { layers, files: files.len(), dirs, obscured: 0 },
+            stats: Stats { layers, files: files.len(), dirs, obscured },
             files,
         }
-        .fix_stats()
-    }
-}
-
-impl Output {
-    fn fix_stats(mut self) -> Self {
-        self.stats.obscured = self.files.len();
-        self
     }
 }
 
