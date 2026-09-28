@@ -1,0 +1,21 @@
+{
+  "layers": [
+    {
+      "writes": [
+        "app/main.py",
+        "app/util/helpers.py",
+        "etc/config.yml",
+        "data/old_a.csv",
+        "data/old_b.csv"
+      ]
+    },
+    {
+      "writes": ["app/main.py", "data/fresh.csv"],
+      "whiteouts": ["etc/config.yml"],
+      "opaques": ["data"]
+    },
+    {
+      "writes": ["etc/config.yml", "app/util/cache.py"]
+    }
+  ]
+}

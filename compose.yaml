@@ -1,0 +1,18 @@
+# The `layers` service only runs the layer-merge CLI: it reads a layer
+# document from stdin and writes the merged image view to stdout. It never
+# touches the host filesystem — no volumes are mounted, the container root
+# filesystem is read-only, and the process runs as an unprivileged user
+# with no capabilities and no network.
+#
+# Usage:
+#   docker compose build
+#   docker compose run --rm -T layers < examples/sample.json
+services:
+  layers:
+    build: .
+    image: layer-merge:local
+    stdin_open: true
+    read_only: true
+    network_mode: none
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
