@@ -30,7 +30,7 @@ fn main() -> ExitCode {
         }
         Err(err) => {
             println!("{}", layer_merge::err_json(&err, pretty));
-            ExitCode::SUCCESS
+            ExitCode::from(err.exit_code() as u8)
         }
     }
 }
